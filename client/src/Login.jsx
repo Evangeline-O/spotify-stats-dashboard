@@ -1,19 +1,21 @@
-export default function Login() {
+import './App.css'
+
+function Login() {
   const handleLogin = () => {
-  window.location.href = "https://538849fba56a.ngrok-free.app/login";
-};
+    window.location.href = 'http://localhost:4000/login'
+  }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-black text-white">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold mb-6">🎵 Spotify Stats</h1>
-        <button
-          onClick={handleLogin}
-          className="px-6 py-2 bg-green-500 rounded-lg"
-        >
+    <div className="login-container">
+      <div className="login-card">
+        <h1>Spotify Stats Dashboard</h1>
+        <p>View your listening history and top tracks</p>
+        <button onClick={handleLogin} className="login-btn">
           Login with Spotify
         </button>
       </div>
     </div>
-  );
+  )
 }
+
+export default Login

@@ -7,14 +7,15 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const client_id = process.env.CLIENT_ID;
 const client_secret = process.env.CLIENT_SECRET;
-// Use your CURRENT ngrok URL (from your screenshot)
 const redirect_uri = "https://538849fba56a.ngrok-free.app/callback";
 
+// Login endpoint
 app.get("/login", (req, res) => {
-  const scope = "user-top-read user-read-recently-played";
+  const scope = "user-top-read user-read-recently-played user-read-private user-read-email";
   res.redirect(
     `https://accounts.spotify.com/authorize?client_id=${client_id}&response_type=code&redirect_uri=${encodeURIComponent(
       redirect_uri
@@ -22,6 +23,7 @@ app.get("/login", (req, res) => {
   );
 });
 
+// Callback endpoint
 app.get("/callback", async (req, res) => {
   try {
     const code = req.query.code || null;
@@ -38,16 +40,62 @@ app.get("/callback", async (req, res) => {
       { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
 
-    res.json(response.data);
+    res.redirect(`http://localhost:5173/?access_token=${response.data.access_token}`);
   } catch (error) {
     console.error("Error exchanging code for token:", error.response?.data || error.message);
     res.status(500).json({ error: "Failed to get tokens from Spotify" });
   }
 });
 
-// CRUCIAL: Server must listen on port 4000 to match your ngrok tunnel
-const PORT = 4000;
+// Get user profile
+app.get("/profile", async (req, res) => {
+  try {
+    const { access_token } = req.query;
+    const response = await axios.get("https://api.spotify.com/v1/me", {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error getting profile:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to get profile" });
+  }
+});
+
+// Get top tracks
+app.get("/top-tracks", async (req, res) => {
+  try {
+    const { access_token, time_range = "medium_term", limit = 20 } = req.query;
+    const response = await axios.get(`https://api.spotify.com/v1/me/top/tracks?time_range=${time_range}&limit=${limit}`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error getting top tracks:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to get top tracks" });
+  }
+});
+
+// Get recently played tracks
+app.get("/recently-played", async (req, res) => {
+  try {
+    const { access_token, limit = 20 } = req.query;
+    const response = await axios.get(`https://api.spotify.com/v1/me/player/recently-played?limit=${limit}`, {
+      headers: {
+        Authorization: `Bearer ${access_token}`
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Error getting recently played:", error.response?.data || error.message);
+    res.status(500).json({ error: "Failed to get recently played tracks" });
+  }
+});
+
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Login URL: https://538849fba56a.ngrok-free.app/login`);
 });
