@@ -1,25 +1,72 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
+import { apiRequest } from './api'; // Import the API utility
 
-function RecentlyPlayed({ accessToken }) {
-  const [recentTracks, setRecentTracks] = useState(null)
+function RecentlyPlayed({ accessToken, refreshToken, setAccessToken }) {
+  const [recentTracks, setRecentTracks] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchRecentTracks = async () => {
       try {
-        const response = await fetch(
-          `http://localhost:4000/recently-played?access_token=${accessToken}&limit=20`
-        )
-        const data = await response.json()
-        setRecentTracks(data)
+        // Make sure we have an access token
+        if (!accessToken) {
+          setError("No access token available");
+          return;
+        }
+
+        console.log("Fetching recently played tracks with token:", accessToken);
+        
+        // Use the apiRequest utility instead of direct fetch
+        const response = await apiRequest(
+          'https://d4aa76462a32.ngrok-free.app/recently-played',
+          accessToken,
+          refreshToken,
+          setAccessToken,
+          { limit: 20 }
+        );
+        
+        if (!response) {
+          // apiRequest handled the error (likely redirect to login)
+          return;
+        }
+        
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          console.error("Received non-JSON response:", text.substring(0, 100));
+          throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Check if the response contains an error
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        setRecentTracks(data);
+        setError(null);
       } catch (error) {
-        console.error("Error fetching recently played tracks:", error)
+        console.error("Error fetching recently played tracks:", error);
+        setError(error.message);
       }
-    }
+    };
 
-    fetchRecentTracks()
-  }, [accessToken])
+    fetchRecentTracks();
+  }, [accessToken, refreshToken, setAccessToken]);
 
-  if (!recentTracks) return <div className="loading">Loading recently played tracks...</div>
+  if (error) {
+    return (
+      <div className="error">
+        <h2>Error Loading Recently Played Tracks</h2>
+        <p>{error}</p>
+        <p>Please try logging in again.</p>
+      </div>
+    );
+  }
+
+  if (!recentTracks) return <div className="loading">Loading recently played tracks...</div>;
 
   return (
     <div className="tracks-view">
@@ -41,7 +88,7 @@ function RecentlyPlayed({ accessToken }) {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default RecentlyPlayed
+export default RecentlyPlayed;

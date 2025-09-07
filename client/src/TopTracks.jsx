@@ -1,26 +1,73 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react';
+import { apiRequest } from './api'; // Import the API utility
 
-function TopTracks({ accessToken }) {
-  const [topTracks, setTopTracks] = useState(null)
-  const [timeRange, setTimeRange] = useState('medium_term')
+function TopTracks({ accessToken, refreshToken, setAccessToken }) {
+  const [topTracks, setTopTracks] = useState(null);
+  const [timeRange, setTimeRange] = useState('medium_term');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchTopTracks = async () => {
       try {
-        const response = await fetch(
-          `http://localhost:4000/top-tracks?access_token=${accessToken}&time_range=${timeRange}&limit=20`
-        )
-        const data = await response.json()
-        setTopTracks(data)
+        // Make sure we have an access token
+        if (!accessToken) {
+          setError("No access token available");
+          return;
+        }
+
+        console.log("Fetching top tracks with token:", accessToken);
+        
+        // Use the apiRequest utility instead of direct fetch
+        const response = await apiRequest(
+          'https://d4aa76462a32.ngrok-free.app/top-tracks',
+          accessToken,
+          refreshToken,
+          setAccessToken,
+          { time_range: timeRange, limit: 20 }
+        );
+        
+        if (!response) {
+          // apiRequest handled the error (likely redirect to login)
+          return;
+        }
+        
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          const text = await response.text();
+          console.error("Received non-JSON response:", text.substring(0, 100));
+          throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Check if the response contains an error
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        setTopTracks(data);
+        setError(null);
       } catch (error) {
-        console.error("Error fetching top tracks:", error)
+        console.error("Error fetching top tracks:", error);
+        setError(error.message);
       }
-    }
+    };
 
-    fetchTopTracks()
-  }, [accessToken, timeRange])
+    fetchTopTracks();
+  }, [accessToken, refreshToken, setAccessToken, timeRange]);
 
-  if (!topTracks) return <div className="loading">Loading top tracks...</div>
+  if (error) {
+    return (
+      <div className="error">
+        <h2>Error Loading Top Tracks</h2>
+        <p>{error}</p>
+        <p>Please try logging in again.</p>
+      </div>
+    );
+  }
+
+  if (!topTracks) return <div className="loading">Loading top tracks...</div>;
 
   return (
     <div className="tracks-view">
@@ -61,7 +108,7 @@ function TopTracks({ accessToken }) {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
-export default TopTracks
+export default TopTracks;
